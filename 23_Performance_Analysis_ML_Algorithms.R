@@ -11,6 +11,7 @@ library(ddandrda)
 library(OpenML)
 library(dplyr)
 library(gurobi)
+library(farff)
 
 # library(oofos)
 
@@ -138,20 +139,31 @@ data_final <-  data_final[data_final$data.name %in% datasets,]
 
 data_final <- data_final %>% group_by(flow.id, data.name) %>% slice(n())
 
+
+
 extractDataId = function(taskid){
-  tryCatch({res = getOMLTask(task.id = taskid)}, error = function(e){return(NA)})
+  print(taskid)
+  if (length(tryCatch({res = getOMLTask(task.id = taskid)}, error = function(e){return(NA)})) <= 1) {
+    return(NA)
+  }
   return(res$input$data.set$desc$id)
 }
 
 data_final$data.id = sapply(data_final$task.id,function(x)extractDataId(taskid = x))
+data_final[which(is.na(data_final$data.id)), ]
+if (length(which(is.na(data_final$data.id))) > 0) {
+  data_final <- data_final[-which(is.na(data_final$data.id)), ]
+}
 
-### filter data (man kann neue filter einfach in dem filter statement hinzuf�gen!)
-data_final = data_final %>% 
-             group_by(data.id) %>% 
-             mutate(count = n()) %>% 
+
+
+### filter data (man kann neue filter einfach in dem filter statement hinzuf?gen!)
+data_final_filter = data_final %>%
+             group_by(data.id) %>%
+             mutate(count = n()) %>%
              left_join(data_all, by = "data.id") %>%
              filter((count == length(flows_for_paper)) &
-                    (number.of.instances.x > 120) &
+                    (number.of.instances.x > 200) &
                     (number.of.classes == 2)
                     )
 
@@ -160,12 +172,16 @@ params  = getOMLRunParList(runList)
 
 hm = listOMLSetup(4689)
 hm$full.name
-data_final <- data_final[order(data_final$data.name), ]
+data_final_filter <- data_final_filter[order(data_final_filter$data.name), ]
 
-View(data_final)
-dim(data_final) # [1] 1616   30
+View(data_final_filter)
+dim(data_final_filter)
+# Bei allen möglichen Klassifikationsproblemem [1] 1616   30
+# Bei nur binären Klassifikationsproblemen mit sample sizes von 120 [1] 785  47
+# Bei nur binören Klassifikationsproblemen mit beliebiger sample sizes
 
-colnames(data_final)
+
+colnames(data_final_filter)
 # [1] "run.id"                        "task.id"
 # [3] "setup.id"                      "flow.id"
 # [5] "flow.name"                     "flow.version"
@@ -182,14 +198,14 @@ colnames(data_final)
 # [27] "total.cost"                    "usercpu.time.millis"
 # [29] "usercpu.time.millis.testing"   "usercpu.time.millis.training"
 
-learner_unique <- unique(data_final$learner.name)
+learner_unique <- unique(data_final_filter$learner.name)
 length(learner_unique)
 learner_unique
 # [1] "classif.lda"      "classif.multinom" "classif.ranger"
 # [4] "classif.rpart"    "classif.svm"      "classif.xgboost"
 # [7] "classif.glmnet"   "classif.kknn"
 
-data_set_unique <- unique(data_final$data.name)
+data_set_unique <- unique(data_final_filter$data.name)
 length(data_set_unique) # [1] 202
 
 # Function which converts to to partial orders
@@ -226,7 +242,7 @@ convert_to_matrix <- function(single_data_eval) {
 
 
 ######### First data set
-data_set_eval_1 <- data_final[, c("data.name", "learner.name",
+data_set_eval_1 <- data_final_filter[, c("data.name", "learner.name",
                               "f.measure", "predictive.accuracy",
                               "area.under.roc.curve",
                               "root.mean.squared.error")]
@@ -238,22 +254,21 @@ data_set_eval_1 <- data_set_eval_1[data_set_eval_1$learner.name %in%
                                          "classif.rpart",
                                          "classif.svm",
                                          "classif.xgboost",
-                                         "classif.glmnet",
-                                         "classif.kknn"),
+                                         "classif.glmnet"),
                                ]
 
 # single_data_eval <- data_set_eval_1[seq(1,6), ]
 # convert_to_matrix(single_data_eval)
 # list_mat_porders_ml <- rep(NA, length(data_set_unique))
 list_mat_porders_ml_1 <- list()
-number_classifiers <- 6
+number_classifiers <- 5
 for (i in seq(1, length(data_set_unique))) {
   list_mat_porders_ml_1[i] <- list(convert_to_matrix(data_set_eval_1[seq((i - 1) * number_classifiers + 1,
                                                      i * number_classifiers), ]))
 }
 
-length(list_mat_porders_ml_1) # 202
-length(unique(list_mat_porders_ml_1)) # 170
+length(list_mat_porders_ml_1) # 157
+length(unique(list_mat_porders_ml_1)) # 102
 Reduce("|", list_mat_porders_ml_1)
 Reduce("&", list_mat_porders_ml_1)
 Reduce("+", list_mat_porders_ml_1)
@@ -270,187 +285,187 @@ vc_fc_ml_porder$objval # Vc dimension is 11
 
 
 
-
-
-
-######### Second data set -> less performance measures than first data set
-data_set_eval_2 <- data_final[, c("data.name", "learner.name",
-                                  "f.measure", "predictive.accuracy",
-                                  "area.under.roc.curve")]
-
-data_set_eval_2 <- data_set_eval_2[data_set_eval_2$learner.name %in%
-                                     c("classif.ranger",
-                                       "classif.rpart",
-                                       "classif.svm",
-                                       "classif.xgboost",
-                                       "classif.glmnet",
-                                       "classif.kknn"),
-]
-
-list_mat_porders_ml_2 <- list()
-number_classifiers <- 6
-for (i in seq(1, length(data_set_unique))) {
-  list_mat_porders_ml_2[i] <- list(convert_to_matrix(data_set_eval_2[seq((i - 1) * number_classifiers + 1,
-                                                                       i * number_classifiers), ]))
-}
-
-length(list_mat_porders_ml_2) # 202
-length(unique(list_mat_porders_ml_2)) # 170
-Reduce("|", list_mat_porders_ml_2)
-Reduce("&", list_mat_porders_ml_2)
-Reduce("+", list_mat_porders_ml_2)
-
-# Formal context given by the partial orders in list_mat
-fc_ml_porder_2 <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_2)
-
-# VC dimension is upper bound
-# see package oofos on github.com/schollmeyer
-ml_porder_model_2 <- compute_extent_vc_dimension(fc_ml_porder_2)
-vc_fc_ml_porder_2 <- gurobi::gurobi(ml_porder_model_2, list(outputflag = 0))
-
-vc_fc_ml_porder_2$objval # Vc dimension is 12
-
-
-
-
-
-
-
-######### Third data set -> less classifiers than data set one
-data_set_eval_3 <- data_final[, c("data.name", "learner.name",
-                                  "f.measure", "predictive.accuracy",
-                                  "area.under.roc.curve",
-                                  "root.mean.squared.error")]
-data_set_eval_3[ ,"root.mean.squared.error"] <-
-  1 - data_set_eval_3[ ,"root.mean.squared.error"]
-
-data_set_eval_3 <- data_set_eval_3[data_set_eval_3$learner.name %in%
-                                     c("classif.ranger",
-                                       "classif.rpart",
-                                       "classif.svm",
-                                       "classif.xgboost"),
-]
-
-# single_data_eval <- data_set_eval_1[seq(1,6), ]
-# convert_to_matrix(single_data_eval)
-# list_mat_porders_ml <- rep(NA, length(data_set_unique))
-number_classifiers <- 4
-list_mat_porders_ml_3 <- list()
-for (i in seq(1, length(data_set_unique))) {
-  list_mat_porders_ml_3[i] <- list(convert_to_matrix(data_set_eval_3[seq((i - 1) * number_classifiers + 1,
-                                                                         i * number_classifiers), ]))
-}
-
-length(list_mat_porders_ml_3) # 202
-length(unique(list_mat_porders_ml_3)) # 67
-Reduce("|", list_mat_porders_ml_3)
-Reduce("&", list_mat_porders_ml_3)
-Reduce("+", list_mat_porders_ml_3)
-
-# Formal context given by the partial orders in list_mat
-fc_ml_porder_3 <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_3)
-
-# VC dimension is upper bound
-# see package oofos on github.com/schollmeyer
-ml_porder_model_3 <- compute_extent_vc_dimension(fc_ml_porder_3)
-vc_fc_ml_porder_3 <- gurobi::gurobi(ml_porder_model_3, list(outputflag = 0))
-
-vc_fc_ml_porder_3$objval # Vc dimension is 7
-
-
-
-
-
-
-######### Forth data set -> less classifiers than data set one,
-# but more than data set three
-data_set_eval_4 <- data_final[, c("data.name", "learner.name",
-                                  "f.measure", "predictive.accuracy",
-                                  "area.under.roc.curve",
-                                  "root.mean.squared.error")]
-data_set_eval_4[ ,"root.mean.squared.error"] <-
-  1 - data_set_eval_4[ ,"root.mean.squared.error"]
-
-data_set_eval_4 <- data_set_eval_4[data_set_eval_4$learner.name %in%
-                                     c("classif.ranger",
-                                       "classif.rpart",
-                                       "classif.svm",
-                                       "classif.xgboost",
-                                       "classif.glmnet"),
-]
-
-# single_data_eval <- data_set_eval_1[seq(1,6), ]
-# convert_to_matrix(single_data_eval)
-# list_mat_porders_ml <- rep(NA, length(data_set_unique))
-list_mat_porders_ml_4 <- list()
-number_classifiers <- 5
-for (i in seq(1, length(data_set_unique))) {
-  list_mat_porders_ml_4[i] <- list(convert_to_matrix(data_set_eval_4[seq((i - 1) * number_classifiers + 1,
-                                                                         i * number_classifiers), ]))
-}
-
-length(list_mat_porders_ml_4) # 202
-length(unique(list_mat_porders_ml_4)) # 131
-Reduce("|", list_mat_porders_ml_4)
-Reduce("&", list_mat_porders_ml_4)
-Reduce("+", list_mat_porders_ml_4)
-
-# Formal context given by the partial orders in list_mat
-fc_ml_porder_4 <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_4)
-
-# VC dimension is upper bound
-# see package oofos on github.com/schollmeyer
-ml_porder_model_4 <- compute_extent_vc_dimension(fc_ml_porder_4)
-vc_fc_ml_porder_4 <- gurobi::gurobi(ml_porder_model_4, list(outputflag = 0))
-
-vc_fc_ml_porder_4$objval # Vc dimension is 10
-
-
-
-
-
-######### Fith data set -> less classifiers than data set one,
-# but more than data set three
-data_set_eval_5 <- data_final[, c("data.name", "learner.name",
-                                  "f.measure", "predictive.accuracy",
-                                  "area.under.roc.curve",
-                                  "root.mean.squared.error")]
-data_set_eval_5[ ,"root.mean.squared.error"] <-
-  1 - data_set_eval_5[ ,"root.mean.squared.error"]
-
-data_set_eval_5 <- data_set_eval_5[data_set_eval_5$learner.name %in%
-                                     c("classif.ranger",
-                                       "classif.rpart",
-                                       "classif.svm",
-                                       "classif.xgboost",
-                                       "classif.kknn"),
-]
-
-# single_data_eval <- data_set_eval_1[seq(1,6), ]
-# convert_to_matrix(single_data_eval)
-# list_mat_porders_ml <- rep(NA, length(data_set_unique))
-list_mat_porders_ml_5 <- list()
-number_classifiers <- 5
-for (i in seq(1, length(data_set_unique))) {
-  list_mat_porders_ml_5[i] <- list(convert_to_matrix(data_set_eval_5[seq((i - 1) * number_classifiers + 1,
-                                                                         i * number_classifiers), ]))
-}
-
-length(list_mat_porders_ml_5) # 202
-length(unique(list_mat_porders_ml_5)) # 131
-Reduce("|", list_mat_porders_ml_5)
-Reduce("&", list_mat_porders_ml_5)
-Reduce("+", list_mat_porders_ml_5)
-
-# Formal context given by the partial orders in list_mat
-fc_ml_porder_5 <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_5)
-
-# VC dimension is upper bound
-# see package oofos on github.com/schollmeyer
-ml_porder_model_5 <- compute_extent_vc_dimension(fc_ml_porder_5)
-vc_fc_ml_porder_5 <- gurobi::gurobi(ml_porder_model_5, list(outputflag = 0))
-
-vc_fc_ml_porder_5$objval # Vc dimension is 9
+#
+#
+#
+# ######### Second data set -> less performance measures than first data set
+# data_set_eval_2 <- data_final[, c("data.name", "learner.name",
+#                                   "f.measure", "predictive.accuracy",
+#                                   "area.under.roc.curve")]
+#
+# data_set_eval_2 <- data_set_eval_2[data_set_eval_2$learner.name %in%
+#                                      c("classif.ranger",
+#                                        "classif.rpart",
+#                                        "classif.svm",
+#                                        "classif.xgboost",
+#                                        "classif.glmnet",
+#                                        "classif.kknn"),
+# ]
+#
+# list_mat_porders_ml_2 <- list()
+# number_classifiers <- 6
+# for (i in seq(1, length(data_set_unique))) {
+#   list_mat_porders_ml_2[i] <- list(convert_to_matrix(data_set_eval_2[seq((i - 1) * number_classifiers + 1,
+#                                                                        i * number_classifiers), ]))
+# }
+#
+# length(list_mat_porders_ml_2) # 202
+# length(unique(list_mat_porders_ml_2)) # 170
+# Reduce("|", list_mat_porders_ml_2)
+# Reduce("&", list_mat_porders_ml_2)
+# Reduce("+", list_mat_porders_ml_2)
+#
+# # Formal context given by the partial orders in list_mat
+# fc_ml_porder_2 <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_2)
+#
+# # VC dimension is upper bound
+# # see package oofos on github.com/schollmeyer
+# ml_porder_model_2 <- compute_extent_vc_dimension(fc_ml_porder_2)
+# vc_fc_ml_porder_2 <- gurobi::gurobi(ml_porder_model_2, list(outputflag = 0))
+#
+# vc_fc_ml_porder_2$objval # Vc dimension is 12
+#
+#
+#
+#
+#
+#
+#
+# ######### Third data set -> less classifiers than data set one
+# data_set_eval_3 <- data_final[, c("data.name", "learner.name",
+#                                   "f.measure", "predictive.accuracy",
+#                                   "area.under.roc.curve",
+#                                   "root.mean.squared.error")]
+# data_set_eval_3[ ,"root.mean.squared.error"] <-
+#   1 - data_set_eval_3[ ,"root.mean.squared.error"]
+#
+# data_set_eval_3 <- data_set_eval_3[data_set_eval_3$learner.name %in%
+#                                      c("classif.ranger",
+#                                        "classif.rpart",
+#                                        "classif.svm",
+#                                        "classif.xgboost"),
+# ]
+#
+# # single_data_eval <- data_set_eval_1[seq(1,6), ]
+# # convert_to_matrix(single_data_eval)
+# # list_mat_porders_ml <- rep(NA, length(data_set_unique))
+# number_classifiers <- 4
+# list_mat_porders_ml_3 <- list()
+# for (i in seq(1, length(data_set_unique))) {
+#   list_mat_porders_ml_3[i] <- list(convert_to_matrix(data_set_eval_3[seq((i - 1) * number_classifiers + 1,
+#                                                                          i * number_classifiers), ]))
+# }
+#
+# length(list_mat_porders_ml_3) # 202
+# length(unique(list_mat_porders_ml_3)) # 67
+# Reduce("|", list_mat_porders_ml_3)
+# Reduce("&", list_mat_porders_ml_3)
+# Reduce("+", list_mat_porders_ml_3)
+#
+# # Formal context given by the partial orders in list_mat
+# fc_ml_porder_3 <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_3)
+#
+# # VC dimension is upper bound
+# # see package oofos on github.com/schollmeyer
+# ml_porder_model_3 <- compute_extent_vc_dimension(fc_ml_porder_3)
+# vc_fc_ml_porder_3 <- gurobi::gurobi(ml_porder_model_3, list(outputflag = 0))
+#
+# vc_fc_ml_porder_3$objval # Vc dimension is 7
+#
+#
+#
+#
+#
+#
+# ######### Forth data set -> less classifiers than data set one,
+# # but more than data set three
+# data_set_eval_4 <- data_final[, c("data.name", "learner.name",
+#                                   "f.measure", "predictive.accuracy",
+#                                   "area.under.roc.curve",
+#                                   "root.mean.squared.error")]
+# data_set_eval_4[ ,"root.mean.squared.error"] <-
+#   1 - data_set_eval_4[ ,"root.mean.squared.error"]
+#
+# data_set_eval_4 <- data_set_eval_4[data_set_eval_4$learner.name %in%
+#                                      c("classif.ranger",
+#                                        "classif.rpart",
+#                                        "classif.svm",
+#                                        "classif.xgboost",
+#                                        "classif.glmnet"),
+# ]
+#
+# # single_data_eval <- data_set_eval_1[seq(1,6), ]
+# # convert_to_matrix(single_data_eval)
+# # list_mat_porders_ml <- rep(NA, length(data_set_unique))
+# list_mat_porders_ml_4 <- list()
+# number_classifiers <- 5
+# for (i in seq(1, length(data_set_unique))) {
+#   list_mat_porders_ml_4[i] <- list(convert_to_matrix(data_set_eval_4[seq((i - 1) * number_classifiers + 1,
+#                                                                          i * number_classifiers), ]))
+# }
+#
+# length(list_mat_porders_ml_4) # 202
+# length(unique(list_mat_porders_ml_4)) # 131
+# Reduce("|", list_mat_porders_ml_4)
+# Reduce("&", list_mat_porders_ml_4)
+# Reduce("+", list_mat_porders_ml_4)
+#
+# # Formal context given by the partial orders in list_mat
+# fc_ml_porder_4 <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_4)
+#
+# # VC dimension is upper bound
+# # see package oofos on github.com/schollmeyer
+# ml_porder_model_4 <- compute_extent_vc_dimension(fc_ml_porder_4)
+# vc_fc_ml_porder_4 <- gurobi::gurobi(ml_porder_model_4, list(outputflag = 0))
+#
+# vc_fc_ml_porder_4$objval # Vc dimension is 10
+#
+#
+#
+#
+#
+# ######### Fith data set -> less classifiers than data set one,
+# # but more than data set three
+# data_set_eval_5 <- data_final[, c("data.name", "learner.name",
+#                                   "f.measure", "predictive.accuracy",
+#                                   "area.under.roc.curve",
+#                                   "root.mean.squared.error")]
+# data_set_eval_5[ ,"root.mean.squared.error"] <-
+#   1 - data_set_eval_5[ ,"root.mean.squared.error"]
+#
+# data_set_eval_5 <- data_set_eval_5[data_set_eval_5$learner.name %in%
+#                                      c("classif.ranger",
+#                                        "classif.rpart",
+#                                        "classif.svm",
+#                                        "classif.xgboost",
+#                                        "classif.kknn"),
+# ]
+#
+# # single_data_eval <- data_set_eval_1[seq(1,6), ]
+# # convert_to_matrix(single_data_eval)
+# # list_mat_porders_ml <- rep(NA, length(data_set_unique))
+# list_mat_porders_ml_5 <- list()
+# number_classifiers <- 5
+# for (i in seq(1, length(data_set_unique))) {
+#   list_mat_porders_ml_5[i] <- list(convert_to_matrix(data_set_eval_5[seq((i - 1) * number_classifiers + 1,
+#                                                                          i * number_classifiers), ]))
+# }
+#
+# length(list_mat_porders_ml_5) # 202
+# length(unique(list_mat_porders_ml_5)) # 131
+# Reduce("|", list_mat_porders_ml_5)
+# Reduce("&", list_mat_porders_ml_5)
+# Reduce("+", list_mat_porders_ml_5)
+#
+# # Formal context given by the partial orders in list_mat
+# fc_ml_porder_5 <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_5)
+#
+# # VC dimension is upper bound
+# # see package oofos on github.com/schollmeyer
+# ml_porder_model_5 <- compute_extent_vc_dimension(fc_ml_porder_5)
+# vc_fc_ml_porder_5 <- gurobi::gurobi(ml_porder_model_5, list(outputflag = 0))
+#
+# vc_fc_ml_porder_5$objval # Vc dimension is 9
 
 ################################################################################
 # Descriptive Analysis
