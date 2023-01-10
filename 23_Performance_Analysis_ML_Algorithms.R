@@ -11,6 +11,7 @@ library(ddandrda)
 library(OpenML)
 library(dplyr)
 library(gurobi)
+
 # library(oofos)
 
 
@@ -93,9 +94,9 @@ library(gurobi)
 ################################################################################
 # ML Data Set Preparation
 ################################################################################
-datasets <- listOMLDataSets()
+data_all <- listOMLDataSets()
 
-rel_datasets <- datasets %>% filter(status == "active" &
+rel_datasets <- data_all %>% filter(status == "active" &
                                      number.of.classes == 2 &
                                      number.of.features < 100 &
                                      number.of.instances < 1000 &
@@ -105,9 +106,22 @@ rel_datasets <- datasets %>% filter(status == "active" &
 )
 flows <- listOMLFlows()
 
+nds = c()
+flows_add = flows
+flows_add$ndata = NA
+for(i in 14978:nrow(flows)){
+  run.results = tryCatch(listOMLRunEvaluations(flow.id = flows_add$flow.id[i], limit = 10000), error = function(e) {print(paste("non-numeric argument", input));
+                   NaN})
+  if(nrow(run.results)> 0){
+    flows_add$ndata[i] = length(unique(run.results$task.id))
+  }
+}
 
 #### flows 2333 (rpart), 2330 (ranger), 2409 (knn), 2337 (xgboost), 2408 (glmnet), 2336(svm), 2317(logit), 2313 lda
-flows_for_paper <- c(2333, 2330, 2409, 2337, 2408, 2336, 2317, 2313)
+test = getOMLFlow(flow.id = 2333)
+#test = getOMLTask(task.id = 3729)
+#### 4689
+flows_for_paper <- c(2333, 2330, 2337, 2408, 2336)
 outls = list()
 for (i in 1:length(flows_for_paper)) {
   temp <- listOMLRunEvaluations(flow.id = flows_for_paper[i], limit = 10000)
@@ -119,9 +133,33 @@ for (i in 1:length(flows_for_paper)) {
   outls[[i]] = temp
 }
 data_final <- do.call('rbind', outls)
+
 data_final <-  data_final[data_final$data.name %in% datasets,]
+
 data_final <- data_final %>% group_by(flow.id, data.name) %>% slice(n())
 
+extractDataId = function(taskid){
+  tryCatch({res = getOMLTask(task.id = taskid)}, error = function(e){return(NA)})
+  return(res$input$data.set$desc$id)
+}
+
+data_final$data.id = sapply(data_final$task.id,function(x)extractDataId(taskid = x))
+
+### filter data (man kann neue filter einfach in dem filter statement hinzufügen!)
+data_final = data_final %>% 
+             group_by(data.id) %>% 
+             mutate(count = n()) %>% 
+             left_join(data_all, by = "data.id") %>%
+             filter((count == length(flows_for_paper)) &
+                    (number.of.instances.x > 120) &
+                    (number.of.classes == 2)
+                    )
+
+runList = getOMLRun(509222)
+params  = getOMLRunParList(runList)
+
+hm = listOMLSetup(4689)
+hm$full.name
 data_final <- data_final[order(data_final$data.name), ]
 
 View(data_final)
