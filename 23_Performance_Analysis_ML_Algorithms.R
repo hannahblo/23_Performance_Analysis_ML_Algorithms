@@ -163,7 +163,7 @@ data_final_filter = data_final %>%
              mutate(count = n()) %>%
              left_join(data_all, by = "data.id") %>%
              filter((count == length(flows_for_paper)) &
-                    (number.of.instances.x > 200) &
+                    (number.of.instances.x > 250) &
                     (number.of.classes == 2)
                     )
 
@@ -267,8 +267,8 @@ for (i in seq(1, length(data_set_unique))) {
                                                      i * number_classifiers), ]))
 }
 
-length(list_mat_porders_ml_1) # 157
-length(unique(list_mat_porders_ml_1)) # 102
+length(list_mat_porders_ml_1) #
+length(unique(list_mat_porders_ml_1)) #
 Reduce("|", list_mat_porders_ml_1)
 Reduce("&", list_mat_porders_ml_1)
 Reduce("+", list_mat_porders_ml_1)
@@ -281,7 +281,7 @@ fc_ml_porder <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_1)
 ml_porder_model <- compute_extent_vc_dimension(fc_ml_porder)
 vc_fc_ml_porder <- gurobi::gurobi(ml_porder_model, list(outputflag = 0))
 
-vc_fc_ml_porder$objval # Vc dimension is 11
+vc_fc_ml_porder$objval # Vc dimension is
 
 
 
