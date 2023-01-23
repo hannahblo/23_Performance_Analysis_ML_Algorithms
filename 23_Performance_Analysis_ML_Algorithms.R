@@ -131,7 +131,7 @@ convert_to_matrix <- function(single_data_eval) {
 
 
 ################################################################################
-# Data Set for complete computation of Scal
+# 1. Data Set for complete computation of Scal
 ################################################################################
 ### filter data (man kann neue filter einfach in dem filter statement hinzuf?gen!)
 data_final_filter = data_final %>%
@@ -191,7 +191,7 @@ fc_ml_porder <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_1)
 # VC dimension is upper bound
 # see package oofos on github.com/schollmeyer
 ml_porder_model <- compute_extent_vc_dimension(fc_ml_porder)
-vc_fc_ml_porder <- gurobi::gurobi(ml_porder_model, list(outputflag = 0))
+vc_fc_ml_porder <- gurobi::gurobi(ml_porder_model)
 
 vc_fc_ml_porder$objval # Vc dimension is 7
 
@@ -200,9 +200,78 @@ vc_fc_ml_porder$objval # Vc dimension is 7
 
 
 
+################################################################################
+# 2. Data Set for complete computation of Scal
+################################################################################
+### filter data (man kann neue filter einfach in dem filter statement hinzuf?gen!)
+data_final_filter = data_final %>%
+  group_by(data.id) %>%
+  mutate(count = n()) %>%
+  left_join(data_all, by = "data.id") %>%
+  filter((count == length(flows_for_paper)) &
+           (number.of.instances.x > 450) &
+           (number.of.instances.x < 10000) &
+           (number.of.classes == 2)
+  )
+data_final_filter <- data_final_filter[order(data_final_filter$data.name), ]
+
+learner_unique <- unique(data_final_filter$learner.name)
+data_set_unique <- unique(data_final_filter$data.name)
+
+# View(data_final_filter)
+# dim(data_final_filter)
+# colnames(data_final_filter)
+# length(learner_unique)
+# learner_unique
+# length(data_set_unique)
+
+data_set_eval_1 <- data_final_filter[, c("data.name", "learner.name",
+                                         "f.measure", "predictive.accuracy",
+                                         "area.under.roc.curve",
+                                         "root.mean.squared.error")]
+data_set_eval_1[ ,"root.mean.squared.error"] <-
+  1 - data_set_eval_1[ ,"root.mean.squared.error"]
+
+data_set_eval_1 <- data_set_eval_1[data_set_eval_1$learner.name %in%
+                                     c("classif.ranger",
+                                       "classif.rpart",
+                                       "classif.multinom",
+                                       "classif.kknn",
+                                       "classif.glmnet"),
+]
+
+# single_data_eval <- data_set_eval_1[seq(1,6), ]
+# convert_to_matrix(single_data_eval)
+# list_mat_porders_ml <- rep(NA, length(data_set_unique))
+list_mat_porders_ml_1 <- list()
+number_classifiers <- 5
+for (i in seq(1, length(data_set_unique))) {
+  list_mat_porders_ml_1[i] <- list(convert_to_matrix(data_set_eval_1[seq((i - 1) * number_classifiers + 1,
+                                                                         i * number_classifiers), ]))
+}
+
+length(list_mat_porders_ml_1) # 80
+length(unique(list_mat_porders_ml_1)) # 58
+Reduce("|", list_mat_porders_ml_1)
+Reduce("&", list_mat_porders_ml_1)
+Reduce("+", list_mat_porders_ml_1)
+
+# Formal context given by the partial orders in list_mat
+fc_ml_porder <- compute_conceptual_scaling(input_porder = list_mat_porders_ml_1)
+
+# VC dimension is upper bound
+# see package oofos on github.com/schollmeyer
+ml_porder_model <- compute_extent_vc_dimension(fc_ml_porder)
+vc_fc_ml_porder <- gurobi::gurobi(ml_porder_model)
+
+vc_fc_ml_porder$objval # Vc dimension is 8
+
+
+
+
 
 ################################################################################
-# Data Set for sampling from Scal
+# Approx: Data Set for sampling from Scal
 ################################################################################
 ### filter data (man kann neue filter einfach in dem filter statement hinzuf?gen!)
 data_final_filter = data_final %>%
@@ -274,15 +343,17 @@ vc_fc_ml_porder$objval # Vc dimension is 9
 
 # Compute the ufg with computing all Scal elements
 list_mat_porders_ml <- list_mat_porders_ml_1
+vc <- 8
 unique_list_mat_porders_ml <- unique(list_mat_porders_ml_1)
 start_time <- Sys.time()
 ufg_depth <- compute_ufg_depth_porder(porder_observed = list_mat_porders_ml,
                                       porder_depth = unique_list_mat_porders_ml,
                                       min_card_ufg = as.integer(2),
-                                      max_card_ufg = as.integer(7))
+                                      max_card_ufg = as.integer(vc))
 total_time <- Sys.time() - start_time
 saveRDS(ufg_depth, "ufg_depth.rds")
 saveRDS(total_time, "total_time.rds")
+# ufg_depth <- readRDS("ufg_depth_complete.rds")
 
 
 # Compute the approximation by sampling Scal
@@ -299,6 +370,16 @@ approx_ufg_depth <- approx_ufg_depth_porder(stop_criteria = list(
 saveRDS(approx_ufg_depth, "ufg_depth_approx.rds")
 
 
+################################################################################
+# Notes on computation time
+################################################################################
+## 1. Data Set for complete computation of Scal
+# computation time of the ufg complete, not approximated:
+# Time difference of 1.52838 hours
+
+## 2. Data Set for complete computation of Scal
+# computation time of the ufg complete, not approximated:
+#
 
 ################################################################################
 # Descriptive Analysis
@@ -306,7 +387,8 @@ saveRDS(approx_ufg_depth, "ufg_depth_approx.rds")
 library(hasseDiagram) # for hasse
 
 depth_value <- ufg_depth
-unique_porders <- unique_list_mat_porders_ml
+unique_porders <-  unique(list_mat_porders_ml_1)
+saveRDS(depth_value, "depth_values.rds")
 
 print(paste0("The minimal value is ", min(depth_value)))
 print(paste0("The maximal value is ", max(depth_value)))
@@ -317,39 +399,51 @@ print(paste0("The number of depth value duplicates are ", length(depth_value) -
                length(unique(depth_value))))
 
 ### Distribution of Depth Values
-pdf("plots_depth_approx.pdf", onefile = TRUE)
+pdf("boxplot_depth.pdf", onefile = TRUE)
 boxplot(depth_value, main = "Boxplot of the depth values")
 dev.off()
 
 ### Maximal Value
 maximal_value <- max(depth_value)
 max_depth_index <- sort(depth_value, index.return = TRUE, decreasing = TRUE)$ix[seq(1, 8)]
+max_depth_index_int <- sort(depth_value, index.return = TRUE, decreasing = TRUE)$ix[1]
+unique_porders[[max_depth_index_int]]
 names_columns <- colnames(unique_porders[[1]])
 item_number <- dim(unique_porders[[1]])[1]
 
 setwd()
-pdf("plots_maximal_values_approx.pdf", onefile = TRUE)
+pdf("plots_maximal_values.pdf", onefile = TRUE)
 for (i in max_depth_index) {
   mat <- matrix(as.logical(unique_porders[[i]]), ncol = item_number)
   colnames(mat) <- rownames(mat) <- names_columns
-  hasse(mat)
+  # print(mat * 1)
+  # hasse(mat) plots the graph from top to bottom, with smallest value at bottom
+  # -> change and set arrow to "backward"
+  hasse(t(mat), parameters = list(arrow = "backward", shape = "roundrect"))
 }
 dev.off()
 
 
 ### Minimaö Values
-maximal_value <- min(depth_value)
+minimal_value <- min(depth_value)
 min_depth_index <- sort(depth_value, index.return = TRUE, decreasing = FALSE)$ix[seq(1, 8)]
 names_columns <- colnames(unique_porders[[1]])
 item_number <- dim(unique_porders[[1]])[1]
 
 setwd()
-pdf("plots_minimal_values_approx.pdf", onefile = TRUE)
+pdf("plots_minimal_values.pdf", onefile = TRUE)
 for (i in min_depth_index) {
   mat <- matrix(as.logical(unique_porders[[i]]), ncol = item_number)
   colnames(mat) <- rownames(mat) <- names_columns
-  hasse(mat)
+  print(mat * 1)
+  # hasse(mat) plots the graph from top to bottom, with smallest value at bottom
+  # -> change and set arrow to "backward"
+  # hasse(t(mat), parameters = list(arrow = "backward", shape = "roundrect"))
 }
 dev.off()
+
+# sample
+# sample size von oben verkleinern
+# resampling ansatz
 
 

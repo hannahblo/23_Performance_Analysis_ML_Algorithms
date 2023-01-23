@@ -1,0 +1,139 @@
+data_final_filter = data_final %>%
+  group_by(data.id) %>%
+  mutate(count = n()) %>%
+  left_join(data_all, by = "data.id") %>%
+  filter((count == length(flows_for_paper)) &
+           (number.of.instances.x > 550) &
+           (number.of.classes == 2)
+  )
+
+
+##########################################################################
+# Result examples
+##########################################################################
+### General Informations
+> print(paste0("The minimal value is ", min(depth_value)))
+[1] "The minimal value is 0.205420054200542"
+> print(paste0("The maximal value is ", max(depth_value)))
+[1] "The maximal value is 0.808784225773292"
+> print(paste0("The mean value is ", mean(depth_value)))
+[1] "The mean value is 0.516415755536866"
+> print(paste0("The standard deviation is ", sd(depth_value)))
+[1] "The standard deviation is 0.147298573579788"
+> print(paste0("The median is ", median(depth_value)))
+[1] "The median is 0.545724698626297"
+> print(paste0("The number of depth value duplicates are ", length(depth_value) -
++                length(unique(depth_value))))
+[1] "The number of depth value duplicates are 0"
+
+
+
+### The eight deepest depth value. The first one has the maximal depth, the
+### second the second highest value etc.
+### The entrie [i,j] == 1 means that i is smaller or equal to j
+### The entry [i,j] == 0 means that i is larger than j
+
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              1             0              0            0
+classif.ranger                  0              1             0              0            0
+classif.rpart                   0              1             1              0            1
+classif.glmnet                  0              1             0              1            0
+classif.kknn                    0              1             0              0            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              1             1              0            1
+classif.ranger                  0              1             0              0            0
+classif.rpart                   0              1             1              0            1
+classif.glmnet                  0              1             1              1            1
+classif.kknn                    0              1             0              0            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              1             1              0            0
+classif.ranger                  0              1             0              0            0
+classif.rpart                   0              1             1              0            0
+classif.glmnet                  0              1             1              1            0
+classif.kknn                    1              1             1              1            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              1             1              0            1
+classif.ranger                  0              1             0              0            0
+classif.rpart                   0              1             1              0            0
+classif.glmnet                  1              1             1              1            1
+classif.kknn                    0              1             1              0            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              1             1              0            1
+classif.ranger                  0              1             0              0            0
+classif.rpart                   0              1             1              0            1
+classif.glmnet                  1              1             1              1            1
+classif.kknn                    0              1             0              0            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              1             1              0            0
+classif.ranger                  0              1             0              0            0
+classif.rpart                   0              1             1              0            0
+classif.glmnet                  1              1             1              1            0
+classif.kknn                    1              1             1              1            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              1             1              1            1
+classif.ranger                  0              1             0              0            0
+classif.rpart                   0              1             1              0            1
+classif.glmnet                  0              0             0              1            0
+classif.kknn                    0              0             0              0            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              0             0              0            0
+classif.ranger                  0              1             0              0            0
+classif.rpart                   0              0             1              0            0
+classif.glmnet                  0              0             0              1            0
+classif.kknn                    0              0             0              0            1
+
+
+
+### The eight lowest depth value. The first one has the smallest depth, the
+### second the second smallest value etc.
+### The entrie [i,j] == 1 means that i is smaller or equal to j
+### The entry [i,j] == 0 means that i is larger than j
+
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              0             0              0            0
+classif.ranger                  1              1             1              1            1
+classif.rpart                   1              0             1              1            0
+classif.glmnet                  1              0             0              1            0
+classif.kknn                    1              0             1              1            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              1             1              1            1
+classif.ranger                  0              1             1              1            1
+classif.rpart                   0              0             1              0            0
+classif.glmnet                  0              0             1              1            0
+classif.kknn                    0              0             1              0            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              0             0              0            0
+classif.ranger                  1              1             1              1            0
+classif.rpart                   1              0             1              1            0
+classif.glmnet                  1              0             0              1            0
+classif.kknn                    1              1             1              1            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              0             0              1            0
+classif.ranger                  1              1             0              1            1
+classif.rpart                   1              1             1              1            1
+classif.glmnet                  0              0             0              1            0
+classif.kknn                    0              0             0              1            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              0             0              0            0
+classif.ranger                  1              1             0              1            1
+classif.rpart                   1              0             1              1            1
+classif.glmnet                  1              0             0              1            0
+classif.kknn                    1              0             0              1            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              0             0              0            0
+classif.ranger                  1              1             0              1            1
+classif.rpart                   1              1             1              1            1
+classif.glmnet                  0              0             0              1            0
+classif.kknn                    1              0             0              1            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              0             0              0            1
+classif.ranger                  1              1             0              1            1
+classif.rpart                   0              0             1              0            0
+classif.glmnet                  0              0             0              1            0
+classif.kknn                    0              0             0              0            1
+                 classif.multinom classif.ranger classif.rpart classif.glmnet classif.kknn
+classif.multinom                1              0             0              0            0
+classif.ranger                  1              1             0              1            0
+classif.rpart                   1              1             1              1            0
+classif.glmnet                  1              0             0              1            0
+classif.kknn                    1              1             1              1            1
