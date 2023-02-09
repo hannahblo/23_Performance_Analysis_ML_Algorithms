@@ -290,7 +290,7 @@ data_final_filter = data_final %>%
   left_join(data_all, by = "data.id") %>%
   filter((count == length(flows_for_paper)) &
            (number.of.instances.x > 450) &
-           (number.of.instances.x < 500) & # 10000
+           (number.of.instances.x < 10000) & # 10000 500
            (number.of.classes == 2)
   )
 data_final_filter <- data_final_filter[order(data_final_filter$data.name), ]
@@ -333,10 +333,8 @@ for (i in seq(1, length(unique(data_final_filter$data.name)))) {
                                                                          i * number_classifiers), ]))
 }
 
-unique_list_mat_porders_ml <- unique(list_mat_porders_ml)
 
 # saveRDS(list_mat_porders_ml, "list_mat_porders_ml.rds")
-# saveRDS(unique_list_mat_porders_ml, "unique_list_mat_porders_ml.rds")
 # saveRDS(data_set_eval, "data_set_eval.rds")
 
 
@@ -369,7 +367,7 @@ ggplot(df_edge_exist, aes(x = Var2, y = Var1)) +
         legend.title = element_text(size = 12),
         legend.text = element_text(size = 12),
         plot.title = element_blank())
-
+# TODO automatisches absichern
 
 
 
@@ -414,7 +412,7 @@ total_time <- Sys.time() - start_time
 
 # saveRDS(total_time, "total_time.rds")
 # saveRDS(ufg_premises, "ufg_premises.rds")
-# length(ufgs)
+# length(ufg_premises)
 
 
 # ufg depth computation
@@ -422,10 +420,13 @@ emp_prob <- count_dup / number_obs
 depth_ufg <- rep(0, length(list_ml_porder_unique))
 constant_c <- 0
 
-for (i in 1:dim(ufg_premises)[1]) {
+for (i in 1:length(ufg_premises)) {
   # print(paste0("Iteration ", i,  " of ", dim(ufg_premises)[1]))
-  index_premise <- ufg_premises[i, which(ufg_premises[i, ] != 0)]
-  print(paste0("cardinaltiy ufg_premise is ", length(index_premise)))
+  index_premise <- ufg_premises[[i]]
+  if (length(index_premise) < 2) {
+    print(paste0("cardinaltiy ufg_premise is ", length(index_premise)))
+  }
+
   prod_emp_ufg <- prod(emp_prob[index_premise])
   concl_ufg <- test_porder_in_concl(list_ml_porder_unique[index_premise], list_ml_porder_unique) * 1
 
@@ -599,8 +600,8 @@ print(paste0("The maximal value is ", max(depth_value_all)))
 print(paste0("The mean value is ", mean(depth_value_all)))
 print(paste0("The standard deviation is ", sd(depth_value_all)))
 print(paste0("The median is ", median(depth_value_all)))
-print(paste0("The number of depth value duplicates are ", length(depth_value_all) -
-               length(unique(depth_value_all))))
+print(paste0("The number of depth value duplicates (reduced by duplicates given by the data) are ", length(depth_value) -
+               length(unique(depth_value))))
 
 ### Distribution of Depth Values
 pdf("boxplot_depth.pdf", onefile = TRUE)
