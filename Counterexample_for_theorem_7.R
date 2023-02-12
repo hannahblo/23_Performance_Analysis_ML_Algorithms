@@ -75,7 +75,7 @@ ufgs_2
 # are different.
 # On the other hand, both data sets have the same sum statistics:
 
-sum_statistics_1 <- Reduce("+", l3[c(6, 7, 4)])
-sum_statistics_2 <- Reduce("+", l3[c(6, 3, 8)])
+sum_statistics_1 <- Reduce("+", list_porder_all[c(6, 7, 4)])
+sum_statistics_2 <- Reduce("+", list_porder_all[c(6, 3, 8)])
 
 all(sum_statistics_1 == sum_statistics_2)
