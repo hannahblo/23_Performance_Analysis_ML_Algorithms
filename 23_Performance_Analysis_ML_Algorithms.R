@@ -10,13 +10,7 @@
 
 ### Information about packages oofos. This package is under developement on git.
 # Note that to install this package, the R-package gurobi is needed. This is an
-#
-# Further, the RBGL Package is needed
-# if (!require("BiocManager", quietly = TRUE))
-#   install.packages("BiocManager")
-# BiocManager::install("RBGL")
-# After installation of gurobi and RBGL nochmal nachsehen, the following
-# library(gurobi)
+# remove.packages("oofos")
 # install.packages("devtools")
 # devtools::install_github("schollmeyer/oofos")
 
@@ -308,7 +302,7 @@ data_final_filter <- data_final_filter[order(data_final_filter$data.name), ]
 # We are only interested in the following performance measures
 data_set_eval <- data_final_filter[, c("data.name", "learner.name",
                                          "f.measure", "predictive.accuracy",
-                                         "area.under.roc.curve",
+                                         "area.under.roc.curve", # Brier Score
                                          "root.mean.squared.error")]
 # In contrast to the other performance measure, lower root.mean.squared.error
 # is better.
@@ -352,11 +346,11 @@ Reduce("+", list_mat_porders_ml)
 
 
 edges <- Reduce("+", list_mat_porders_ml)
-colnames(edges) <- rownames(edges) <- c("multinom", "ranger", "rpart", "glmnet", "kknn")
+colnames(edges) <- rownames(edges) <- c("LR", "RF", "CART", "LASSO", "KNN")
 df_edge_exist <- melt(edges)
 df_edge_exist <- df_edge_exist[df_edge_exist$value != 0, ]
 
-ggplot(df_edge_exist, aes(x = Var2, y = Var1)) +
+ggplot(df_edge_exist, aes(x = Var1, y = Var2)) +
   geom_raster(aes(fill = value)) +
   scale_fill_gradient(low = "lightcyan1", high = "darkcyan") +
   labs(x = "is below", y = "is above") +
@@ -593,7 +587,7 @@ hasse(t(mat), parameters = list(arrow = "backward", shape = "roundrect"))
 
 
 ################################################################################
-# Descriptive Analysis: ufg depth
+# Descriptive Analysis: minimal, maximal ufg depth
 ################################################################################
 print(paste0("The minimal value is ", min(depth_value_all)))
 print(paste0("The maximal value is ", max(depth_value_all)))
@@ -759,3 +753,39 @@ dev.off()
 # # sample size von oben verkleinern
 # # resampling ansatz
 #
+
+
+################################################################################
+# Descriptive Analysis: dispersion
+################################################################################
+
+# compute ufg for all depth values
+emp_prob_all <- count_dup / number_obs
+depth_ufg_all <- rep(0, length(list_porder_all))
+constant_c_all <- 0
+
+for (i in 1:length(ufg_premises)) {
+  print(paste0("Iteration ", i,  " of ", length(ufg_premises)))
+  index_premise_all <- ufg_premises[[i]]
+
+  prod_emp_ufg_all <- prod(emp_prob_all[index_premise_all])
+  concl_ufg_all <- test_porder_in_concl(list_ml_porder_unique[index_premise_all], list_porder_all) * 1
+
+  depth_ufg_all <- depth_ufg_all + concl_ufg_all * prod_emp_ufg_all
+  constant_c_all <- constant_c_all + prod_emp_ufg_all
+}
+
+depth_value_all <- depth_ufg_all / constant_c_all
+unique(depth_value_all)
+length(unique(depth_value_all))
+length(list_porder_all)
+
+# compute proportion
+quantiles_ufg <- quantile(depth_value, probs = c(0.25, 0.5, 0.75))
+
+# Note that the 25$ highest depth value corresponds to the 75 quantile
+proportion_75 <- length(which(depth_value_all >= quantiles_ufg[1])) / length(depth_value_all)
+proportion_50 <- length(which(depth_value_all >= quantiles_ufg[2])) / length(depth_value_all)
+proportion_25 <- length(which(depth_value_all >= quantiles_ufg[3])) / length(depth_value_all)
+proportion_75
+
